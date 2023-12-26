@@ -1,3 +1,10 @@
+"""
+Tools for converting raw Bayer images to standard RGB images.
+
+Reference
+- https://www.flir.com/support-center/iis/machine-vision/application-note/using-color-correction/
+"""
+
 import numpy as np
 from enum import Enum
 from scipy.io import loadmat
@@ -32,7 +39,9 @@ class Raw2RGB:
         self.black_level = config["black_level"]
         self.white_level = int(config["white_level"])
         self.bayer_pattern = config["bayer_pattern"]
-        self.auto_white_balance = AutoWhiteBalance(config["auto_white_balance_method"], config["verbose"])
+        self.auto_white_balance = AutoWhiteBalance(
+            config["auto_white_balance_method"], self.white_level-self.black_level, config["verbose"]
+        )
         self.color_correction_matrix = config["color_correction_matrix"]
         self.gamma = config["gamma"]
         self.color_correction_coef = config["color_enhancement_coef"]

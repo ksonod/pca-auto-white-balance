@@ -1,3 +1,7 @@
+"""
+Auto white balance
+"""
+
 from enum import Enum
 import numpy as np
 
@@ -9,10 +13,11 @@ class AutoWhiteBalanceMethods(Enum):
 
 
 class AutoWhiteBalance:
-    def __init__(self, awb_method, verbose=False):
+    def __init__(self, awb_method, saturation_value, verbose=False,):
         self.awb_method = awb_method
         self.wb_gain = np.array([1, 1, 1])
         self.verbose = verbose
+        self.saturation_value = saturation_value
 
     def __str__(self):
         return f"{self.awb_method.value}"
@@ -32,7 +37,10 @@ class AutoWhiteBalance:
 
         return r, g, b
 
-    @staticmethod
-    def apply_gray_world_awb(r, g, b):
-        mean_g = np.mean(g)
-        return np.array([mean_g/np.mean(r), 1.0, mean_g/np.mean(b)])
+    def apply_gray_world_awb(self, r, g, b):
+
+        mean_r = np.mean(r[r <= self.saturation_value])
+        mean_g = np.mean(g[g <= self.saturation_value])
+        mean_b = np.mean(b[b <= self.saturation_value])
+
+        return np.array([mean_g/mean_r, 1.0, mean_g/mean_b])

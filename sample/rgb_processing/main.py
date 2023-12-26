@@ -28,8 +28,8 @@ CONFIG = {
         "matfile_path": Path(r"../color_correction_matrix/ccm.mat")
     },
     "gamma": 2.2,  # 2.2
-    "color_enhancement_coef": 1.9,
-    "no_processing": False,  # only True when you want to get input data for CCM construction.
+    "color_enhancement_coef": 1.5,
+    "no_processing": False,  # Set it to be True when you want to get input data for CCM construction.
     "save_img": False,
     "verbose": True,
 }
