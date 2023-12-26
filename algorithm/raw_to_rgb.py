@@ -1,7 +1,7 @@
 import numpy as np
 from enum import Enum
-from white_balance import AutoWhiteBalance
-
+from algorithm.white_balance import AutoWhiteBalance
+from scipy.io import loadmat
 
 class BayerPattern(Enum):
     BGGR = "bggr"
@@ -10,15 +10,31 @@ class BayerPattern(Enum):
     RGGB = "rggb"
 
 
+class ColorCorrectionMatrix(Enum):
+    NONE = "none"
+    PREDIFINED = "prefefined"
+    READ_MAT = "read_mat"
+
+
 class Raw2RGB:
     def __init__(self, config):
+
+        if config["no_processing"]:
+            # Disable CCM, gamma, and color enhancement.
+            config["color_correction_matrix"] = {
+                "method": ColorCorrectionMatrix.NONE,
+            }
+            config["gamma"] = 1.0
+            config["color_enhancement_coef"] = 1.0
+
         self.black_level = config["black_level"]
         self.white_level = config["white_level"]
         self.bayer_pattern = config["bayer_pattern"]
-        self.auto_white_balance = AutoWhiteBalance(config["auto_white_balance_method"])
-        self.use_color_correction_matrix = config["use_color_correction_matrix"]
+        self.auto_white_balance = AutoWhiteBalance(config["auto_white_balance_method"], config["verbose"])
+        self.color_correction_matrix = config["color_correction_matrix"]
         self.gamma = config["gamma"]
         self.color_correction_coef = config["color_enhancement_coef"]
+        self.verbose = config["verbose"]
 
     def __call__(self, raw_img):
         raw_img = self.subtract_black_level(raw_img)
@@ -29,6 +45,12 @@ class Raw2RGB:
         r, g, b = self.apply_color_enhancement(r, g, b)
         rgb = np.stack([r, g, b], axis=2)
         rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+
+        if self.verbose:
+            print(f"AWB: {self.auto_white_balance.__str__()} | "
+                  f"CCM: {self.color_correction_matrix['method'].value} | "
+                  f"Gamma: {self.gamma} | "
+                  f"CE: {self.color_correction_coef}")
         return rgb
 
     def subtract_black_level(self, raw_img):
@@ -54,29 +76,34 @@ class Raw2RGB:
         return r, g, b
 
     def apply_color_correction_matrix(self, r, g, b):
-        if self.use_color_correction_matrix:
+        if self.color_correction_matrix["method"] == ColorCorrectionMatrix.PREDIFINED:
             cc_matrix = np.array([
-                [1.3368, - 0.4129, - 0.0596],
-                [-0.4370, 1.4319, - 0.6943],
-                [- 0.1554, - 0.2949, 1.4746]
+                [1.4, -0.5, -0.1],
+                [- 0.1, 1.1, 0.01],
+                [0.01, -0.64, 1.6]
             ])
-            cc_matrix = cc_matrix.transpose()  # TODO: remove it.
-            cc_offset = np.array([58.7671, 61.5549, 64.4064])
-        else:
+            cc_offset = np.array([0, 0, 0])
+        elif self.color_correction_matrix["method"] == ColorCorrectionMatrix.READ_MAT:
+            ccm = loadmat(self.color_correction_matrix["matfile_path"])
+            cc_matrix = ccm["ccm"][:3, :].transpose()
+            cc_offset = ccm["ccm"][3, :]
+        elif self.color_correction_matrix["method"] == ColorCorrectionMatrix.NONE:
             cc_matrix = np.array([
                 [1, 0, 0],
                 [0, 1, 0],
                 [0, 0, 1]
             ])
             cc_offset = np.array([0.0, 0.0, 0.0])
+        else:
+            raise NotImplementedError("Choose a right CCM option.")
 
-        r = r * cc_matrix[0, 0] + g * cc_matrix[0, 1] + b * cc_matrix[0, 2] + cc_offset[0]
-        g = r * cc_matrix[1, 0] + g * cc_matrix[1, 1] + b * cc_matrix[1, 2] + cc_offset[1]
-        b = r * cc_matrix[2, 0] + g * cc_matrix[2, 1] + b * cc_matrix[2, 2] + cc_offset[2]
+        r_ccm = r * cc_matrix[0, 0] + g * cc_matrix[0, 1] + b * cc_matrix[0, 2] + cc_offset[0]
+        b_ccm = r * cc_matrix[1, 0] + g * cc_matrix[1, 1] + b * cc_matrix[1, 2] + cc_offset[1]
+        g_ccm = r * cc_matrix[2, 0] + g * cc_matrix[2, 1] + b * cc_matrix[2, 2] + cc_offset[2]
 
-        r[r < 0] = 0
-        g[g < 0] = 0
-        b[b < 0] = 0
+        r_ccm[r_ccm < 0] = 0
+        g_ccm[g_ccm < 0] = 0
+        b_ccm[b_ccm < 0] = 0
 
         return r, g, b
 
