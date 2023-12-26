@@ -1,12 +1,13 @@
 import numpy as np
 from enum import Enum
-from algorithm.white_balance import AutoWhiteBalance
 from scipy.io import loadmat
-import matlab.engine
+import cv2
+from algorithm.white_balance import AutoWhiteBalance
+
 
 class BayerPattern(Enum):
     BGGR = "bggr"
-    RGBG = "rgbg"
+    GBRG = "gbrg"
     GRBG = "grbg"
     RGGB = "rggb"
 
@@ -49,7 +50,7 @@ class Raw2RGB:
         demosaic_img = self.demosaic_raw(raw_img)
         r, g, b = self.auto_white_balance(demosaic_img[:, :, 0], demosaic_img[:, :, 1], demosaic_img[:, :, 2])
         r, g, b = self.apply_color_correction_matrix(r, g, b)
-        r, g, b = self.apply_gamma_corection(r, g, b, gamma=self.gamma, maximum_input_value=self.white_level-self.black_level)
+        r, g, b = self.apply_gamma_corection(r, g, b)
         r, g, b = self.apply_color_enhancement(r, g, b)
         rgb = np.stack([r, g, b], axis=2)
         rgb = np.clip(rgb, 0, 255).astype(np.uint8)
@@ -62,9 +63,18 @@ class Raw2RGB:
         return processed_img
 
     def demosaic_raw(self, raw_img):
-        mat_eng = matlab.engine.start_matlab()
-        demosaic_img = mat_eng.demosaic(raw_img, self.bayer_pattern.value)
-        return np.array(demosaic_img)
+        if self.bayer_pattern == BayerPattern.RGGB:
+            demosaic_img = cv2.cvtColor(raw_img, cv2.COLOR_BayerRGGB2RGB)
+        elif self.bayer_pattern == BayerPattern.BGGR:
+            demosaic_img = cv2.cvtColor(raw_img, cv2.COLOR_BayerBGGR2RGB)
+        elif self.bayer_pattern == BayerPattern.GRBG:
+            demosaic_img = cv2.cvtColor(raw_img, cv2.COLOR_BayerGRBG2RGB)
+        elif self.bayer_pattern == BayerPattern.GBRG:
+            demosaic_img = cv2.cvtColor(raw_img, cv2.COLOR_BayerGBRG2RGB)
+        else:
+            raise NotImplementedError("Choose a right CFA pattern.")
+
+        return demosaic_img
 
     def apply_color_correction_matrix(self, r, g, b):
         if self.color_correction_matrix["method"] == ColorCorrectionMatrix.PREDIFINED:
@@ -100,10 +110,11 @@ class Raw2RGB:
 
         return r, g, b
 
-    def apply_gamma_corection(self, r, g, b, gamma=2.2, maximum_input_value=4095 - 200):
-        coef = (maximum_input_value) ** (1 / gamma)
+    def apply_gamma_corection(self, r, g, b):
+        maximum_input_value = self.white_level - self.black_level
+        coef = maximum_input_value ** (1 / self.gamma)
         rgb = np.stack([r, g, b], axis=2)
-        rgb = 255 / coef * rgb ** (1 / gamma)
+        rgb = 255 / coef * rgb ** (1 / self.gamma)
         rgb = np.round(np.clip(rgb, 0, 255)).astype(np.uint8)
         return rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
 
