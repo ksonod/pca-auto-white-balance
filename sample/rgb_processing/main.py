@@ -14,21 +14,21 @@ References
 
 
 INPUT_FILE = {
-     "raw_image": Path(r"../../data/sample_image/AlphaISP_2592x1536_12bits_RGGB_Scene5.raw")
+     "raw_image": Path(r"../../data/sample_image/AlphaISP_2592x1536_12bits_RGGB_Scene12.raw")
 }
 
 CONFIG = {
     "raw_image_shape": (1536, 2592),  # height x width
-    "bayer_pattern": BayerPattern.BGGR,
+    "bayer_pattern": BayerPattern.RGGB,
     "auto_white_balance_method": AutoWhiteBalanceMethods.GRAYWORLD,
     "black_level": 200,
     "white_level": 4095,
     "color_correction_matrix": {
         "method": ColorCorrectionMatrix.READ_MAT,
         "matfile_path": Path(r"../color_correction_matrix/ccm.mat")
-                                },
+    },
     "gamma": 2.2,  # 2.2
-    "color_enhancement_coef": 1.5,
+    "color_enhancement_coef": 1.9,
     "no_processing": False,  # only True when you want to get input data for CCM construction.
     "save_img": False,
     "verbose": True,

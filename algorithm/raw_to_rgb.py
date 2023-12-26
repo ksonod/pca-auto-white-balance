@@ -2,6 +2,7 @@ import numpy as np
 from enum import Enum
 from algorithm.white_balance import AutoWhiteBalance
 from scipy.io import loadmat
+import matlab.engine
 
 class BayerPattern(Enum):
     BGGR = "bggr"
@@ -28,7 +29,7 @@ class Raw2RGB:
             config["color_enhancement_coef"] = 1.0
 
         self.black_level = config["black_level"]
-        self.white_level = config["white_level"]
+        self.white_level = int(config["white_level"])
         self.bayer_pattern = config["bayer_pattern"]
         self.auto_white_balance = AutoWhiteBalance(config["auto_white_balance_method"], config["verbose"])
         self.color_correction_matrix = config["color_correction_matrix"]
@@ -37,20 +38,22 @@ class Raw2RGB:
         self.verbose = config["verbose"]
 
     def __call__(self, raw_img):
+        if self.verbose:
+            print(f"- AWB: {self.auto_white_balance.__str__()} | "
+                  f"CCM: {self.color_correction_matrix['method'].value} | "
+                  f"Gamma: {self.gamma} | "
+                  f"CE: {self.color_correction_coef} | "
+                  f"White level {self.white_level}")
+
         raw_img = self.subtract_black_level(raw_img)
-        r, g, b = self.demosaic_raw(raw_img)
-        r, g, b = self.auto_white_balance(r, g, b)
+        demosaic_img = self.demosaic_raw(raw_img)
+        r, g, b = self.auto_white_balance(demosaic_img[:, :, 0], demosaic_img[:, :, 1], demosaic_img[:, :, 2])
         r, g, b = self.apply_color_correction_matrix(r, g, b)
         r, g, b = self.apply_gamma_corection(r, g, b, gamma=self.gamma, maximum_input_value=self.white_level-self.black_level)
         r, g, b = self.apply_color_enhancement(r, g, b)
         rgb = np.stack([r, g, b], axis=2)
         rgb = np.clip(rgb, 0, 255).astype(np.uint8)
 
-        if self.verbose:
-            print(f"AWB: {self.auto_white_balance.__str__()} | "
-                  f"CCM: {self.color_correction_matrix['method'].value} | "
-                  f"Gamma: {self.gamma} | "
-                  f"CE: {self.color_correction_coef}")
         return rgb
 
     def subtract_black_level(self, raw_img):
@@ -58,22 +61,10 @@ class Raw2RGB:
         processed_img[processed_img < 0] = 0
         return processed_img
 
-    def get_rgb_component_from_raw_mosaiced_image(self, raw_img):
-        if self.bayer_pattern == BayerPattern.BGGR:
-            r = raw_img[::2, ::2]
-            gr = raw_img[::2, 1::2]
-            gb = raw_img[1::2, ::2]
-            b = raw_img[1::2, 1::2]
-        else:
-            raise NotImplementedError("Only BGGR Bayer pattern is supported.")
-        return r, gr, gb, b
-
     def demosaic_raw(self, raw_img):
-        # TODO: Implement an appropriate demosaicing algorithm.
-        r, gr, gb, b = self.get_rgb_component_from_raw_mosaiced_image(raw_img)
-        g = np.copy(gr)
-
-        return r, g, b
+        mat_eng = matlab.engine.start_matlab()
+        demosaic_img = mat_eng.demosaic(raw_img, self.bayer_pattern.value)
+        return np.array(demosaic_img)
 
     def apply_color_correction_matrix(self, r, g, b):
         if self.color_correction_matrix["method"] == ColorCorrectionMatrix.PREDIFINED:
@@ -89,14 +80,15 @@ class Raw2RGB:
             cc_matrix = ccm["ccm"][:3, :].transpose()
             cc_offset = ccm["ccm"][3, :]
         elif self.color_correction_matrix["method"] == ColorCorrectionMatrix.NONE:
-            cc_matrix = np.array([
-                [1, 0, 0],
-                [0, 1, 0],
-                [0, 0, 1]
-            ])
-            cc_offset = np.array([0.0, 0.0, 0.0])
+            cc_matrix = np.identity(3)
+            cc_offset = np.zeros(3)
         else:
             raise NotImplementedError("Choose a right CCM option.")
+
+        if self.verbose:
+            print("- CCM -\n"
+                  f" {cc_matrix} \n -- CCM Offset \n"
+                  f" {cc_offset}")
 
         r_ccm = r * cc_matrix[0, 0] + g * cc_matrix[0, 1] + b * cc_matrix[0, 2] + cc_offset[0]
         b_ccm = r * cc_matrix[1, 0] + g * cc_matrix[1, 1] + b * cc_matrix[1, 2] + cc_offset[1]

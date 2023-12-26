@@ -28,7 +28,7 @@ class AutoWhiteBalance:
         b = b * self.wb_gain[2]
 
         if self.verbose:
-            print(f"AWB gain: {self.wb_gain}")
+            print(f"- AWB gain: {self.wb_gain}")
 
         return r, g, b
 
