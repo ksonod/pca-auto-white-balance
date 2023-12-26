@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-from white_balance import AutoWhiteBalanceMethods
-from raw_to_rgb import Raw2RGB, BayerPattern
+from algorithm.white_balance import AutoWhiteBalanceMethods
+from algorithm.raw_to_rgb import Raw2RGB, BayerPattern, ColorCorrectionMatrix
+from pathlib import Path
 
 """
 References
@@ -13,7 +14,7 @@ References
 
 
 INPUT_FILE = {
-     "raw_image": r"../../data/sample/AlphaISP_2592x1536_12bits_RGGB_Scene12.raw"
+     "raw_image": Path(r"../../data/sample/AlphaISP_2592x1536_12bits_RGGB_Scene5.raw")
 }
 
 CONFIG = {
@@ -22,10 +23,15 @@ CONFIG = {
     "auto_white_balance_method": AutoWhiteBalanceMethods.GRAYWORLD,
     "black_level": 200,
     "white_level": 4095,
-    "use_color_correction_matrix": True,
+    "color_correction_matrix": {
+        "method": ColorCorrectionMatrix.READ_MAT,
+        "matfile_path": Path(r"../color_correction_matrix/ccm.mat")
+                                },
     "gamma": 2.2,  # 2.2
-    "color_enhancement_coef": 1.0,  # 1.75
-    "save_img": False
+    "color_enhancement_coef": 1.5,  # 1.5
+    "no_processing": False,  # only True when you want to get input data for CCM construction.
+    "save_img": False,
+    "verbose": True,
 }
 
 
@@ -38,7 +44,7 @@ def run_scripts(input_file, config):
 
     if config["save_img"]:
         im = Image.fromarray(rgb)
-        im.save("processed_rgb.png")
+        im.save(input_file["raw_image"].parent / "processed_rgb.png")
 
     plt.figure()
     plt.imshow(rgb)
