@@ -14,7 +14,7 @@ References
 
 
 INPUT_FILE = {
-     "raw_image": Path(r"../../data/sample/AlphaISP_2592x1536_12bits_RGGB_Scene5.raw")
+     "raw_image": Path(r"../../data/sample_image/AlphaISP_2592x1536_12bits_RGGB_Scene5.raw")
 }
 
 CONFIG = {
@@ -28,7 +28,7 @@ CONFIG = {
         "matfile_path": Path(r"../color_correction_matrix/ccm.mat")
                                 },
     "gamma": 2.2,  # 2.2
-    "color_enhancement_coef": 1.5,  # 1.5
+    "color_enhancement_coef": 1.5,
     "no_processing": False,  # only True when you want to get input data for CCM construction.
     "save_img": False,
     "verbose": True,
@@ -48,7 +48,6 @@ def run_scripts(input_file, config):
 
     plt.figure()
     plt.imshow(rgb)
-    plt.show()
     plt.show()
 
 

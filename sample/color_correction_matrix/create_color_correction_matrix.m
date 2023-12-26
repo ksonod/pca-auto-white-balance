@@ -11,7 +11,7 @@ clear all;
 %% USER SETTING
 addpath(strcat(pwd, '/sample/color_correction_matrix'));
 save_ccm = true;
-input_file_path = 'data/sample/processed_rgb.png';
+input_file_path = 'data/sample_image/processed_rgb.png';
 
 %% Detect Macbeth chart and evaluate colors.
 
@@ -46,4 +46,5 @@ imshow(new_img)
 if save_ccm
     save_file_path = strcat(pwd, '/sample/color_correction_matrix/ccm.mat');
     save(save_file_path, 'ccm');
+    disp('ccm.mat is saved')
 end

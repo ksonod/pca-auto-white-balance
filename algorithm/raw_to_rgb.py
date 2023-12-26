@@ -77,6 +77,7 @@ class Raw2RGB:
 
     def apply_color_correction_matrix(self, r, g, b):
         if self.color_correction_matrix["method"] == ColorCorrectionMatrix.PREDIFINED:
+            # User can modify this matrix.
             cc_matrix = np.array([
                 [1.4, -0.5, -0.1],
                 [- 0.1, 1.1, 0.01],
