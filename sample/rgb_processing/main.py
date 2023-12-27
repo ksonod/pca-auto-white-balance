@@ -35,7 +35,7 @@ CONFIG = {
 }
 
 
-def run_scripts(input_file, config):
+def run_scripts(input_file: dict, config: dict):
 
     raw_img = np.fromfile(input_file["raw_image"], dtype=np.uint16)
     raw_img = raw_img.reshape(config["raw_image_shape"])

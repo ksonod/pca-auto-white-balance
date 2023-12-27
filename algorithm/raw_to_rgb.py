@@ -10,7 +10,7 @@ from enum import Enum
 from scipy.io import loadmat
 import cv2
 from algorithm.white_balance import AutoWhiteBalance
-
+from typing import Tuple
 
 class BayerPattern(Enum):
     BGGR = "bggr"
@@ -36,11 +36,11 @@ class Raw2RGB:
             config["gamma"] = 1.0
             config["color_enhancement_coef"] = 1.0
 
-        self.black_level = config["black_level"]
+        self.black_level = config["black_level"]  # Black level can be a single number or 2D data with a correct shape.
         self.white_level = int(config["white_level"])
         self.bayer_pattern = config["bayer_pattern"]
         self.auto_white_balance = AutoWhiteBalance(
-            config["auto_white_balance_method"], self.white_level-self.black_level, config["verbose"]
+            config["auto_white_balance_method"], config["verbose"]
         )
         self.color_correction_matrix = config["color_correction_matrix"]
         self.gamma = config["gamma"]
@@ -54,10 +54,10 @@ class Raw2RGB:
                   f"Gamma: {self.gamma} | "
                   f"CE: {self.color_correction_coef} | "
                   f"White level {self.white_level}")
-
         raw_img = self.subtract_black_level(raw_img)
         demosaic_img = self.demosaic_raw(raw_img)
-        r, g, b = self.auto_white_balance(demosaic_img[:, :, 0], demosaic_img[:, :, 1], demosaic_img[:, :, 2])
+        saturation_mask = self.get_saturation_mask(demosaic_img)
+        r, g, b = self.auto_white_balance(demosaic_img[:, :, 0], demosaic_img[:, :, 1], demosaic_img[:, :, 2], saturation_mask)
         r, g, b = self.apply_color_correction_matrix(r, g, b)
         r, g, b = self.apply_gamma_corection(r, g, b)
         r, g, b = self.apply_color_enhancement(r, g, b)
@@ -66,12 +66,24 @@ class Raw2RGB:
 
         return rgb
 
-    def subtract_black_level(self, raw_img):
+    def get_saturation_mask(self, demosaic_img: np.ndarray) -> np.ndarray:
+        """
+        From demosaic image, numpy array including boolean is constructed to show saturated pixels. True means the pixel
+        is saturated.
+        :param demosaic_img: h x w x 3 demosaiced image (numpy array)
+        :return: numpy array containing boolean to show saturated pixels.
+        """
+
+        return (self.white_level-self.black_level <= demosaic_img[:, :, 0]) + \
+               (self.white_level-self.black_level <= demosaic_img[:, :, 1]) + \
+               (self.white_level - self.black_level <= demosaic_img[:, :, 2])
+
+    def subtract_black_level(self, raw_img: np.ndarray) -> np.ndarray:
         processed_img = raw_img - self.black_level
         processed_img[processed_img < 0] = 0
         return processed_img
 
-    def demosaic_raw(self, raw_img):
+    def demosaic_raw(self, raw_img: np.ndarray) -> np.ndarray:
         if self.bayer_pattern == BayerPattern.RGGB:
             demosaic_img = cv2.cvtColor(raw_img, cv2.COLOR_BayerRGGB2RGB)
         elif self.bayer_pattern == BayerPattern.BGGR:
@@ -85,7 +97,9 @@ class Raw2RGB:
 
         return demosaic_img
 
-    def apply_color_correction_matrix(self, r, g, b):
+    def apply_color_correction_matrix(
+            self, r: np.ndarray, g: np.ndarray, b: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         if self.color_correction_matrix["method"] == ColorCorrectionMatrix.PREDIFINED:
             # User can modify this matrix.
             cc_matrix = np.array([
@@ -119,7 +133,9 @@ class Raw2RGB:
 
         return r, g, b
 
-    def apply_gamma_corection(self, r, g, b):
+    def apply_gamma_corection(
+            self, r: np.ndarray, g: np.ndarray, b: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         maximum_input_value = self.white_level - self.black_level
         coef = maximum_input_value ** (1 / self.gamma)
         rgb = np.stack([r, g, b], axis=2)
@@ -127,7 +143,9 @@ class Raw2RGB:
         rgb = np.round(np.clip(rgb, 0, 255)).astype(np.uint8)
         return rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
 
-    def apply_color_enhancement(self, r, g, b):
+    def apply_color_enhancement(
+            self, r: np.ndarray, g: np.ndarray, b: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
         # YCbCr to RGB with color enhancement
         mat1 = np.array([
