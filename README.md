@@ -4,7 +4,7 @@ This repository provides:
 - Python RGB data processing pipeline to convert raw mosaiced images to standard RGB images (i.e., demosaicing, AWB, color correction matrix, gamma correction, and color enhancement).
 - Matlab script to construct a color correction matrix (CCM) using [Macbeth chart](https://en.wikipedia.org/wiki/ColorChecker).  
 
-*I am not the author of the aforementioned paper. I build this tool only for learning purposes.
+*I am not the author of the aforementioned paper. I have built this tool only for learning purposes.
 
 
 # How to Use
