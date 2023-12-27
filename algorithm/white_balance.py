@@ -26,9 +26,7 @@ class AutoWhiteBalance:
         if self.awb_method == AutoWhiteBalanceMethods.GRAYWORLD:
             self.wb_gain = self.apply_gray_world_awb(r, g, b, saturation_mask)
         elif self.awb_method == AutoWhiteBalanceMethods.PCA:
-            self.wb_gain = self.apply_pca_based_method(
-                r, g, b, saturation_mask
-            )
+            self.wb_gain = self.apply_pca_based_method(r, g, b, saturation_mask)
 
         r = r * self.wb_gain[0]
         g = g * self.wb_gain[1]
@@ -48,7 +46,7 @@ class AutoWhiteBalance:
         mean_g = np.mean(g[~saturation_mask])
         mean_b = np.mean(b[~saturation_mask])
 
-        return np.array([mean_g/mean_r, 1.0, mean_g/mean_b])
+        return np.array([mean_g / mean_r, 1.0, mean_g / mean_b])
 
     def apply_pca_based_method(
             self, r: np.ndarray, g: np.ndarray, b: np.ndarray, saturation_mask: np.ndarray
@@ -86,12 +84,12 @@ class AutoWhiteBalance:
         ix_selected = ix[(dx < dx_sorted[idx]) + (dx_sorted[-idx] < dx), :]
 
         # Conduct principle component analysis (PCA)
-        sigma = np.matmul(ix_selected.T, ix_selected)/ix_selected.shape[0]
+        sigma = np.matmul(ix_selected.T, ix_selected) / ix_selected.shape[0]
         eigen_vals, eigen_vecs = np.linalg.eig(sigma)
         principle_vec = np.abs(eigen_vecs[:, np.argmax(eigen_vals)])
 
         return np.array([
-            principle_vec[1]/principle_vec[0],
+            principle_vec[1] / principle_vec[0],
             1.0,
-            principle_vec[1]/principle_vec[2]
+            principle_vec[1] / principle_vec[2]
         ])
