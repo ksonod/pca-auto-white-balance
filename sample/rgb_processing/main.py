@@ -4,9 +4,10 @@ Main script to convert raw images to standard RGB images with different AWB meth
 """
 import matplotlib.pyplot as plt
 from PIL import Image
-from algorithm.white_balance import AutoWhiteBalanceMethods
-from algorithm.raw_to_rgb import Raw2RGB, BayerPattern, ColorCorrectionMatrix, read_raw_file
 from pathlib import Path
+from algorithm.white_balance import AutoWhiteBalanceMethods
+from algorithm.raw_to_rgb import Raw2RGB, ColorCorrectionMatrix, read_raw_file
+from algorithm.color_filter_array import BayerPattern
 
 
 # Path to an input raw image data.
@@ -42,9 +43,9 @@ CONFIG = {
 
 def run_scripts(input_file: dict, config: dict):
 
-    raw_img = read_raw_file(input_file["raw_image"], config["raw_image_shape"])
+    raw_mosaic_img = read_raw_file(input_file["raw_image"], config["raw_image_shape"])
     raw_to_rgb = Raw2RGB(config)
-    rgb = raw_to_rgb(raw_img)
+    rgb = raw_to_rgb(raw_mosaic_img)
 
     if config["save_img"]:
         im = Image.fromarray(rgb)

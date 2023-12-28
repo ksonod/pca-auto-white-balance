@@ -1,9 +1,11 @@
 """
-Auto white balance
+AUTO WHITE BALANCE (AWB)
+AWB is applied to raw mosaiced images.
 """
 
 from enum import Enum
 import numpy as np
+from algorithm.color_filter_array import BayerPattern
 
 
 class AutoWhiteBalanceMethods(Enum):
@@ -13,29 +15,54 @@ class AutoWhiteBalanceMethods(Enum):
 
 
 class AutoWhiteBalance:
-    def __init__(self, awb_method: AutoWhiteBalanceMethods, awb_params: dict, verbose=False):
+    def __init__(
+            self,
+            awb_method: AutoWhiteBalanceMethods,
+            awb_params: dict,
+            bayer_pattern: BayerPattern,
+            verbose=False
+    ):
         self.awb_method = awb_method
         self.awb_params = awb_params
+        self.bayer_pattern = bayer_pattern
         self.wb_gain = np.array([1, 1, 1])
         self.verbose = verbose
 
     def __str__(self):
         return f"{self.awb_method.value}"
 
-    def __call__(self, r, g, b, saturation_mask):
+    def __call__(self, raw_mosaic_img, saturation_mask):
+
+        if self.bayer_pattern == BayerPattern.RGGB:
+            r = raw_mosaic_img[::2, ::2]
+            gr = raw_mosaic_img[::2, 1::2]
+            gb = raw_mosaic_img[1::2, ::2]
+            b = raw_mosaic_img[1::2, 1::2]
+            g = 0.5 * (gr + gb)  # This is based on an assumption where AWB does not rely on spatial information.
+        else:
+            # TODO: Support other Bayer patterns
+            raise NotImplementedError("Other Bayer patterns are not tested yet.")
+
         if self.awb_method == AutoWhiteBalanceMethods.GRAYWORLD:
             self.wb_gain = self.apply_gray_world_awb(r, g, b, saturation_mask)
         elif self.awb_method == AutoWhiteBalanceMethods.PCA:
             self.wb_gain = self.apply_pca_based_method(r, g, b, saturation_mask)
 
-        r = r * self.wb_gain[0]
-        g = g * self.wb_gain[1]
-        b = b * self.wb_gain[2]
+        awb_mosaic_img = np.zeros_like(raw_mosaic_img)  # AWB-applied image
+
+        if self.bayer_pattern == BayerPattern.RGGB:
+            awb_mosaic_img[::2, ::2] = r * self.wb_gain[0]
+            awb_mosaic_img[::2, 1::2] = gr * self.wb_gain[1]
+            awb_mosaic_img[1::2, ::2] = gb * self.wb_gain[1]
+            awb_mosaic_img[1::2, 1::2] = b * self.wb_gain[2]
+        else:
+            # TODO: Support other Bayer patterns
+            raise NotImplementedError("Other Bayer patterns are not tested yet.")
 
         if self.verbose:
             print(f"- AWB gain: {self.wb_gain}")
 
-        return r, g, b
+        return awb_mosaic_img
 
     @staticmethod
     def apply_gray_world_awb(

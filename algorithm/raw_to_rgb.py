@@ -1,7 +1,10 @@
 """
-Tools for converting raw Bayer images to standard RGB images.
-
-Reference
+This code contains tools for converting raw Bayer images to standard RGB images. The RGB processing datapath implemented
+here has the following structure:
+ * Black level subtraction -> AWB -> Demosaic -> Color correction matrix -> Gamma correciton -> Color enhancement
+This structure is similar to the ones described in the references below:
+- O. Losson, L. Macaire, and Y. Yang, Comparison of Color Demosaicing Methods, Advances in Imaging and Electron Physics,
+  vol. 162, pp. 173-265, 2010. doi:10.1016/S1076-5670(10)62005-8
 - https://www.flir.com/support-center/iis/machine-vision/application-note/using-color-correction/
 """
 
@@ -12,13 +15,7 @@ import cv2
 from typing import Tuple
 from pathlib import Path
 from algorithm.white_balance import AutoWhiteBalance
-
-
-class BayerPattern(Enum):
-    BGGR = "bggr"
-    GBRG = "gbrg"
-    GRBG = "grbg"
-    RGGB = "rggb"
+from algorithm.color_filter_array import BayerPattern
 
 
 class ColorCorrectionMatrix(Enum):
@@ -49,6 +46,7 @@ class Raw2RGB:
         self.auto_white_balance = AutoWhiteBalance(
             awb_method=config["auto_white_balance"]["method"],
             awb_params=config["auto_white_balance"]["params"],
+            bayer_pattern=config["bayer_pattern"],
             verbose=config["verbose"]
         )
         self.color_correction_matrix = config["color_correction_matrix"]
@@ -56,20 +54,20 @@ class Raw2RGB:
         self.color_correction_coef = config["color_enhancement_coef"]
         self.verbose = config["verbose"]
 
-    def __call__(self, raw_img: np.ndarray):
+    def __call__(self, raw_mosaic_img: np.ndarray):
         if self.verbose:
             print(f"- AWB: {self.auto_white_balance.__str__()} | "
                   f"CCM: {self.color_correction_matrix['method'].value} | "
                   f"Gamma: {self.gamma} | "
                   f"CE: {self.color_correction_coef} | "
                   f"White level {self.white_level}")
-        raw_img = self.subtract_black_level(raw_img=raw_img)
-        demosaic_img = self.demosaic_raw(raw_img=raw_img)
-        saturation_mask = self.get_saturation_mask(demosaic_img=demosaic_img)
-        r, g, b = self.auto_white_balance(
-            r=demosaic_img[:, :, 0], g=demosaic_img[:, :, 1], b=demosaic_img[:, :, 2], saturation_mask=saturation_mask
+        raw_mosaic_img = self.subtract_black_level(raw_img=raw_mosaic_img)
+        saturation_mask = self.get_saturation_mask(raw_mosaic_img=raw_mosaic_img)
+        awb_mosaic_img = self.auto_white_balance(raw_mosaic_img=raw_mosaic_img, saturation_mask=saturation_mask)
+        demosaic_img = self.demosaic_raw_img(raw_img=awb_mosaic_img)
+        r, g, b = self.apply_color_correction_matrix(
+            r=demosaic_img[:, :, 0], g=demosaic_img[:, :, 1], b=demosaic_img[:, :, 2]
         )
-        r, g, b = self.apply_color_correction_matrix(r=r, g=g, b=b)
         r, g, b = self.apply_gamma_corection(r=r, g=g, b=b)
         r, g, b = self.apply_color_enhancement(r=r, g=g, b=b)
         rgb = np.stack([r, g, b], axis=2)
@@ -77,17 +75,23 @@ class Raw2RGB:
 
         return rgb
 
-    def get_saturation_mask(self, demosaic_img: np.ndarray) -> np.ndarray:
+    def get_saturation_mask(self, raw_mosaic_img: np.ndarray) -> np.ndarray:
         """
-        From demosaic image, numpy array including boolean is constructed to show saturated pixels. True means the pixel
-        is saturated.
-        :param demosaic_img: h x w x 3 demosaiced image (numpy array)
+        From raw mosaic image, numpy array including boolean is constructed to show saturated pixels. True means the
+        pixel is saturated.
+        :param raw_mosaic_img: h x w x 3 demosaiced image (numpy array)
         :return: numpy array containing boolean to show saturated pixels.
         """
+        saturation_value = self.white_level-self.black_level
 
-        return (self.white_level-self.black_level <= demosaic_img[:, :, 0]) + \
-               (self.white_level-self.black_level <= demosaic_img[:, :, 1]) + \
-               (self.white_level - self.black_level <= demosaic_img[:, :, 2])
+        if self.bayer_pattern == BayerPattern.RGGB:
+            return (saturation_value <= raw_mosaic_img[::2, ::2]) + \
+                   (saturation_value <= raw_mosaic_img[::2, 1::2]) + \
+                   (saturation_value <= raw_mosaic_img[1::2, ::2]) + \
+                   (saturation_value <= raw_mosaic_img[1::2, 1::2])
+        else:
+            # TODO: Support other Bayer patterns
+            raise NotImplementedError("Other Bayer patterns are not tested yet.")
 
     def subtract_black_level(self, raw_img: np.ndarray) -> np.ndarray:
 
@@ -95,7 +99,7 @@ class Raw2RGB:
         processed_img[processed_img < 0] = 0
         return processed_img
 
-    def demosaic_raw(self, raw_img: np.ndarray) -> np.ndarray:
+    def demosaic_raw_img(self, raw_img: np.ndarray) -> np.ndarray:
 
         if self.bayer_pattern == BayerPattern.RGGB:
             demosaic_img = cv2.cvtColor(raw_img, cv2.COLOR_BayerRGGB2RGB)
