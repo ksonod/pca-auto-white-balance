@@ -1,5 +1,5 @@
 # About this Repository
-![image info](./docs/images/rgb_image_data_processing.png)
+<img src="./docs/images/rgb_image_data_processing.png" width="350">
 
 This repository provides:
 - Python version of the auto-white-balance (AWB) method based on [principle component analysis](https://en.wikipedia.org/wiki/Principal_component_analysis) (PCA) [[1](https://opg.optica.org/josaa/abstract.cfm?uri=josaa-31-5-1049)].
