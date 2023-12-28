@@ -1,4 +1,6 @@
 # About this Repository
+![image info](./docs/images/rgb_image_data_processing.png)
+
 This repository provides:
 - Python version of the auto-white-balance (AWB) method based on [principle component analysis](https://en.wikipedia.org/wiki/Principal_component_analysis) (PCA) [[1](https://opg.optica.org/josaa/abstract.cfm?uri=josaa-31-5-1049)].
 - Python RGB data processing pipeline to convert raw mosaiced images to standard RGB images (i.e., demosaicing, AWB, color correction matrix, gamma correction, and color enhancement).
